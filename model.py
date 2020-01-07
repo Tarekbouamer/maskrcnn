@@ -565,7 +565,7 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks, config):
     # Handle COCO crowds
     # A crowd box in COCO is a bounding box around several instances. Exclude
     # them from training. A crowd box is given a negative class ID.
-    if torch.nonzero(gt_class_ids < 0).size():
+    if torch.nonzero(gt_class_ids < 0).size()[0]:
         crowd_ix = torch.nonzero(gt_class_ids < 0)[:, 0]
         non_crowd_ix = torch.nonzero(gt_class_ids > 0)[:, 0]
         crowd_boxes = gt_boxes[crowd_ix.data, :]
@@ -594,7 +594,7 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks, config):
 
     # Subsample ROIs. Aim for 33% positive
     # Positive ROIs
-    if torch.nonzero(positive_roi_bool).size():
+    if torch.nonzero(positive_roi_bool).size()[0]:
         positive_indices = torch.nonzero(positive_roi_bool)[:, 0]
 
         positive_count = int(config.TRAIN_ROIS_PER_IMAGE *
@@ -653,7 +653,7 @@ def detection_target_layer(proposals, gt_class_ids, gt_boxes, gt_masks, config):
     negative_roi_bool = roi_iou_max < 0.5
     negative_roi_bool = negative_roi_bool & no_crowd_bool
     # Negative ROIs. Add enough to maintain positive:negative ratio.
-    if torch.nonzero(negative_roi_bool).size() and positive_count>0:
+    if torch.nonzero(negative_roi_bool).size()[0] and positive_count > 0:
         negative_indices = torch.nonzero(negative_roi_bool)[:, 0]
         r = 1.0 / config.ROI_POSITIVE_RATIO
         negative_count = int(r * positive_count - positive_count)
@@ -1053,8 +1053,8 @@ def compute_mrcnn_class_loss(target_class_ids, pred_class_logits):
     """
 
     # Loss
-    if target_class_ids.size():
-        loss = F.cross_entropy(pred_class_logits,target_class_ids.long())
+    if target_class_ids.size()[0]:
+        loss = F.cross_entropy(pred_class_logits, target_class_ids.long())
     else:
         loss = Variable(torch.FloatTensor([0]), requires_grad=False)
         if target_class_ids.is_cuda:
@@ -1071,16 +1071,16 @@ def compute_mrcnn_bbox_loss(target_bbox, target_class_ids, pred_bbox):
     pred_bbox: [batch, num_rois, num_classes, (dy, dx, log(dh), log(dw))]
     """
 
-    if target_class_ids.size():
+    if target_class_ids.size()[0]:
         # Only positive ROIs contribute to the loss. And only
         # the right class_id of each ROI. Get their indicies.
         positive_roi_ix = torch.nonzero(target_class_ids > 0)[:, 0]
         positive_roi_class_ids = target_class_ids[positive_roi_ix.data].long()
-        indices = torch.stack((positive_roi_ix,positive_roi_class_ids), dim=1)
+        indices = torch.stack((positive_roi_ix, positive_roi_class_ids), dim=1)
 
         # Gather the deltas (predicted and true) that contribute to loss
-        target_bbox = target_bbox[indices[:,0].data,:]
-        pred_bbox = pred_bbox[indices[:,0].data,indices[:,1].data,:]
+        target_bbox = target_bbox[indices[:, 0].data, :]
+        pred_bbox = pred_bbox[indices[:, 0].data, indices[:, 1].data, :]
 
         # Smooth L1 loss
         loss = F.smooth_l1_loss(pred_bbox, target_bbox)
@@ -1101,7 +1101,7 @@ def compute_mrcnn_mask_loss(target_masks, target_class_ids, pred_masks):
     pred_masks: [batch, proposals, height, width, num_classes] float32 tensor
                 with values from 0 to 1.
     """
-    if target_class_ids.size():
+    if target_class_ids.size()[0]:
         # Only positive ROIs contribute to the loss. And only
         # the class specific mask of each ROI.
         positive_ix = torch.nonzero(target_class_ids > 0)[:, 0]
@@ -1109,8 +1109,8 @@ def compute_mrcnn_mask_loss(target_masks, target_class_ids, pred_masks):
         indices = torch.stack((positive_ix, positive_class_ids), dim=1)
 
         # Gather the masks (predicted and true) that contribute to loss
-        y_true = target_masks[indices[:,0].data,:,:]
-        y_pred = pred_masks[indices[:,0].data,indices[:,1].data,:,:]
+        y_true = target_masks[indices[:, 0].data, :, :]
+        y_pred = pred_masks[indices[:, 0].data, indices[:, 1].data, :, :]
 
         # Binary cross entropy
         loss = F.binary_cross_entropy(y_pred, y_true)
@@ -1713,7 +1713,7 @@ class MaskRCNN(nn.Module):
             rois, target_class_ids, target_deltas, target_mask = \
                 detection_target_layer(rpn_rois, gt_class_ids, gt_boxes, gt_masks, self.config)
 
-            if not rois.size():
+            if not rois.size()[0]:
                 mrcnn_class_logits = Variable(torch.FloatTensor())
                 mrcnn_class = Variable(torch.IntTensor())
                 mrcnn_bbox = Variable(torch.FloatTensor())
@@ -1931,7 +1931,7 @@ class MaskRCNN(nn.Module):
             rpn_class_logits, rpn_pred_bbox, target_class_ids, mrcnn_class_logits, target_deltas, mrcnn_bbox, target_mask, mrcnn_mask = \
                 self.predict([images, image_metas, gt_class_ids, gt_boxes, gt_masks], mode='training')
 
-            if not target_class_ids.size():
+            if not target_class_ids.size()[0]:
                 continue
 
             # Compute losses
