@@ -45,7 +45,7 @@ Examples of generated masks. These then get scaled and placed on the image in th
 ## Installation
 1. Clone this repository.
 
-        git clone https://github.com/multimodallearning/pytorch-mask-rcnn.git
+        git clone https://github.com/Tarekbouamer/maskrcnn.git
 
     
 2. We use functions from two more repositories that need to be build with the right `--arch` option for cuda support.
